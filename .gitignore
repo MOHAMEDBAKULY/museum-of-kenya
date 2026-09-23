@@ -1,0 +1,6 @@
+node_modules
+dist
+.dream-loop/
+assets/
+*.local
+.DS_Store
