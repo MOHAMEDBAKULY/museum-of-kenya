@@ -17,7 +17,7 @@ function prep(t: THREE.Texture, repeat: [number, number], color = true) {
   const c = t.clone()
   c.wrapS = c.wrapT = THREE.RepeatWrapping
   c.repeat.set(repeat[0], repeat[1])
-  c.anisotropy = 8
+  c.anisotropy = 2
   if (color) c.colorSpace = THREE.SRGBColorSpace
   c.needsUpdate = true
   return c
@@ -35,7 +35,7 @@ const normalCache = new Map<string, THREE.Texture>()
 function normalFrom(img: CanvasImageSource & { width: number; height: number }, key: string, strength: number) {
   const hit = normalCache.get(key)
   if (hit) return hit
-  const N = 512
+  const N = 128
   const c = document.createElement('canvas')
   c.width = c.height = N
   const g = c.getContext('2d', { willReadFrequently: true })!
@@ -60,7 +60,7 @@ function normalFrom(img: CanvasImageSource & { width: number; height: number }, 
   g.putImageData(out, 0, 0)
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 8
+  t.anisotropy = 2
   normalCache.set(key, t)
   return t
 }
@@ -83,7 +83,7 @@ export function useImage(url: string) {
   const t = useTexture(url)
   useMemo(() => {
     t.colorSpace = THREE.SRGBColorSpace
-    t.anisotropy = 8
+    t.anisotropy = 2
     t.needsUpdate = true
   }, [t])
   return t

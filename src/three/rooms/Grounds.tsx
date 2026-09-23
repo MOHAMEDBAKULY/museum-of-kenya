@@ -179,6 +179,8 @@ function Facade() {
           <meshStandardMaterial map={render} color="#f3d7ae" roughness={0.92} />
         </mesh>
       ))}
+      <Frame pos={[-8.6, 2.7, z0 + 0.16]} w={2.7} src="/photos/museum-facade.jpg" caption="The sculpture and the entrance colonnade" />
+      <Frame pos={[8.6, 2.7, z0 + 0.16]} w={2.7} src="/photos/museum-entrance.jpg" caption="The main entrance on Museum Hill" />
       {/* dark clerestory band under the eaves */}
       <mesh position={[0, H + 0.45, z0 - 0.6]}>
         <boxGeometry args={[W, 0.9, 0.1]} />

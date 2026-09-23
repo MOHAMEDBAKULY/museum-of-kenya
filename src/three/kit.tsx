@@ -1,4 +1,4 @@
-import { Billboard, MeshReflectorMaterial, Text } from '@react-three/drei'
+import { Billboard, Text } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
@@ -18,7 +18,6 @@ export function Floor({
   roughness = 0.55,
   color = '#ffffff',
   metalness = 0,
-  reflect = 0,
 }: {
   w: number
   d: number
@@ -27,35 +26,12 @@ export function Floor({
   roughness?: number
   color?: string
   metalness?: number
-  reflect?: number
 }) {
   const { map, normalMap } = useTiledPBR(url, [w / tile, d / tile], 1.6)
-  const hq = useTour((s) => s.quality) === 'high'
   return (
     <mesh rotation-x={-Math.PI / 2} receiveShadow>
       <planeGeometry args={[w, d]} />
-      {reflect > 0 && hq ? (
-        <MeshReflectorMaterial
-          map={map}
-          normalMap={normalMap}
-          normalScale={new THREE.Vector2(0.35, 0.35)}
-          color={color}
-          roughness={roughness}
-          metalness={metalness}
-          blur={[400, 120]}
-          resolution={512}
-          mixBlur={1}
-          mixStrength={reflect}
-          mixContrast={1}
-          depthScale={0.6}
-          minDepthThreshold={0.4}
-          maxDepthThreshold={1.2}
-          mirror={0}
-          envMapIntensity={0.3}
-        />
-      ) : (
-        <meshStandardMaterial map={map} normalMap={normalMap} normalScale={[0.45, 0.45]} roughness={roughness} metalness={metalness} color={color} envMapIntensity={0.35} />
-      )}
+      <meshStandardMaterial map={map} normalMap={normalMap} normalScale={[0.45, 0.45]} roughness={roughness} metalness={metalness} color={color} envMapIntensity={0.35} />
     </mesh>
   )
 }
@@ -500,11 +476,11 @@ export function RoundPlinth({ r, h = 0.6, rail = true }: { r: number; h?: number
   return (
     <group>
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[r, r + 0.05, h, 64]} />
+        <cylinderGeometry args={[r, r + 0.05, h, 24]} />
         <meshStandardMaterial color="#d9c49b" roughness={0.55} />
       </mesh>
       <mesh position={[0, h + 0.01, 0]} rotation-x={-Math.PI / 2} receiveShadow>
-        <circleGeometry args={[r - 0.12, 64]} />
+        <circleGeometry args={[r - 0.12, 24]} />
         <meshStandardMaterial map={earth} color="#c9a07a" roughness={1} />
       </mesh>
       {rail && (
@@ -583,7 +559,7 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
       out.push({
         p: [Math.cos(a) * d, y, Math.sin(a) * d],
         s: kind === 'acacia' ? [sz * 1.4, sz * 0.42, sz * 1.4] : [sz, sz * 0.85, sz],
-        g: jitter(new THREE.IcosahedronGeometry(1, 2), 0.28, seed * 31 + i),
+        g: jitter(new THREE.IcosahedronGeometry(1, 1), 0.28, seed * 31 + i),
       })
     }
     return out
@@ -621,7 +597,7 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
           </mesh>
         ))}
       {clumps.map((c, i) => (
-        <mesh key={i} position={c.p} scale={c.s} geometry={c.g} castShadow receiveShadow>
+        <mesh key={i} position={c.p} scale={c.s} geometry={c.g} receiveShadow>
           <meshStandardMaterial map={leaf} color={kind === 'acacia' ? '#6f8f3c' : '#4f7a34'} roughness={0.9} flatShading />
         </mesh>
       ))}
@@ -631,9 +607,9 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
 
 export function Shrub({ pos, scale = 1, seed = 3, color = '#557f36' }: { pos: V3; scale?: number; seed?: number; color?: string }) {
   const leaf = useTiled(TEX.grass, [1, 1])
-  const g = useMemo(() => jitter(new THREE.IcosahedronGeometry(1, 2), 0.3, seed), [seed])
+  const g = useMemo(() => jitter(new THREE.IcosahedronGeometry(1, 1), 0.3, seed), [seed])
   return (
-    <mesh position={[pos[0], pos[1] + 0.45 * scale, pos[2]]} scale={[scale * 1.2, scale * 0.8, scale * 1.1]} geometry={g} castShadow receiveShadow>
+    <mesh position={[pos[0], pos[1] + 0.45 * scale, pos[2]]} scale={[scale * 1.2, scale * 0.8, scale * 1.1]} geometry={g} receiveShadow>
       <meshStandardMaterial map={leaf} color={color} roughness={0.9} flatShading />
     </mesh>
   )

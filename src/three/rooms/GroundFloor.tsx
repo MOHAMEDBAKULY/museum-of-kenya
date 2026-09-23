@@ -30,7 +30,7 @@ function gourdGeometry() {
     [0, 1.36],
   ]
   for (const [x, y] of prof) pts.push(new THREE.Vector2(x, y))
-  const g = new THREE.LatheGeometry(pts, 14)
+  const g = new THREE.LatheGeometry(pts, 8)
   g.translate(0, -0.68, 0)
   return g
 }
@@ -109,18 +109,18 @@ function Calabashes() {
         <meshStandardMaterial color="#3a2012" roughness={0.4} />
       </mesh>
       <mesh position={[0, 0.55, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[3.45, 2.15, 0.28, 80]} />
+        <cylinderGeometry args={[3.45, 2.15, 0.28, 32]} />
         <meshStandardMaterial color="#f7f1e6" roughness={0.42} />
       </mesh>
       <mesh position={[0, 0.72, 0]} castShadow>
-        <torusGeometry args={[3.35, 0.09, 12, 80]} />
+        <torusGeometry args={[3.35, 0.09, 8, 32]} />
         <meshStandardMaterial color="#f3eee4" roughness={0.4} />
       </mesh>
-      <instancedMesh ref={heap} args={[geo, undefined, HEAP]} castShadow receiveShadow>
-        <meshPhysicalMaterial roughness={0.58} clearcoat={0.22} clearcoatRoughness={0.45} envMapIntensity={0.7} />
+      <instancedMesh ref={heap} args={[geo, undefined, HEAP]} receiveShadow>
+        <meshStandardMaterial roughness={0.58} />
       </instancedMesh>
-      <instancedMesh ref={strings} args={[geo, undefined, ROPES * PER]} castShadow>
-        <meshPhysicalMaterial roughness={0.58} clearcoat={0.22} clearcoatRoughness={0.45} envMapIntensity={0.7} />
+      <instancedMesh ref={strings} args={[geo, undefined, ROPES * PER]}>
+        <meshStandardMaterial roughness={0.58} />
       </instancedMesh>
       {ropeGeos.map((g, i) => (
         <mesh key={i} geometry={g} material={ropeMat} />
@@ -137,7 +137,6 @@ function Calabashes() {
       </group>
       <SpotAt pos={[-5, 10.5, 7]} at={[0, 2.2, 0]} intensity={240} angle={0.3} />
       <SpotAt pos={[5, 10.5, 6]} at={[0, 3.6, 0]} intensity={170} angle={0.3} />
-      <SpotAt pos={[0, 10.8, -6]} at={[0, 5, 0]} intensity={60} angle={0.3} />
       <Blob pos={[0, 0, 0]} size={[7.5, 7.5]} />
     </group>
   )
@@ -269,7 +268,7 @@ export function HallOfKenya() {
   const hw = w / 2
   const cols = [-10, -6, -2, 2, 6, 10]
   return (
-    <IndoorShell room={room} floor={TEX.parquet} floorTile={2.2} floorColor="#f0c2a4" floorRough={0.28} wall="#f7f3ea" ceiling="#f7f3ea" bounce={0.62} ambient={0.16} hemi={0.28} reflect={0.45} keyLight={1.15} envI={0.55} warmth="#ffe4c2">
+    <IndoorShell room={room} floor={TEX.parquet} floorTile={2.2} floorColor="#f0c2a4" floorRough={0.28} wall="#f7f3ea" ceiling="#f7f3ea" bounce={0.62} ambient={0.16} hemi={0.28} keyLight={1.15} envI={0.55} warmth="#ffe4c2">
       <Calabashes />
       {[-1, 1].map((s) => (
         <group key={s}>
@@ -292,11 +291,7 @@ export function HallOfKenya() {
             <boxGeometry args={[0.08, 0.02, d - 1]} />
             <meshStandardMaterial color="#20170f" />
           </mesh>
-          <SpotAt pos={[s * 5.6, 4.8, -8]} at={[s * 9, 1, -3]} intensity={30} angle={0.5} />
-          <SpotAt pos={[s * 5.6, 4.8, 11]} at={[s * 9, 1, 8.5]} intensity={30} angle={0.5} />
-          {[-9, 0, 9].map((z) => (
-            <pointLight key={z} position={[s * 8.8, M - 0.4, z]} intensity={3.5} distance={7} color="#ffd6a0" />
-          ))}
+          <pointLight position={[s * 8.8, M - 0.4, 0]} intensity={8} distance={16} color="#ffd6a0" />
           <TrackLights x={s * 6.15} from={-13} to={13} y={M - 0.15} step={2.6} />
         </group>
       ))}
@@ -351,6 +346,8 @@ export function HallOfKenya() {
           <meshStandardMaterial color="#2b241e" roughness={1} />
         </mesh>
       </Vitrine>
+      <Frame pos={[-4.6, 2.45, -3.2]} w={2.8} src="/photos/hall-of-kenya-calabashes.jpg" caption="The calabash installation beneath the mezzanine" />
+      <Frame pos={[4.6, 2.45, -3.2]} w={2.8} src="/photos/hall-of-kenya.jpg" caption="The Hall of Kenya with its white columns and mezzanine" />
       <Frame pos={[-hw + 0.02, 2.8, -9]} rot={Math.PI / 2} w={2.1} src="/illustrative/butterfly-map.jpg" frame="#1f1812" mat="#1c1916" caption="Butterfly map of Kenya · illustrative" />
       <Frame pos={[-hw + 0.02, 2.5, 6]} rot={Math.PI / 2} w={2.4} src="/photos/hall-of-kenya.jpg" caption="The Hall of Kenya · NMK photograph" />
       <Panel pos={[hw - 0.03, 2.6, -9]} rot={-Math.PI / 2} w={2} h={1.3} kicker="Opened 1930" title="The Coryndon Museum" body="Named after Sir Robert Coryndon, renamed the National Museum of Kenya in 1963, modernised 2005–2008." />
@@ -572,7 +569,7 @@ export function Mammals() {
     return out
   }, [h])
   return (
-    <IndoorShell room={room} floor={TEX.stoneFloor} floorTile={1.8} floorColor="#e7d3b4" floorRough={0.55} wall="#e4c98a" ceiling="#efe4cc" bounce={0.35} ambient={0.18} hemi={0.28} reflect={0.18} keyLight={0.85} envI={0.4} noCeiling warmth="#ffd7a4">
+    <IndoorShell room={room} floor={TEX.stoneFloor} floorTile={1.8} floorColor="#e7d3b4" floorRough={0.55} wall="#e4c98a" ceiling="#efe4cc" bounce={0.35} ambient={0.18} hemi={0.28} keyLight={0.85} envI={0.4} noCeiling warmth="#ffd7a4">
       <Arches w={w} d={d} />
       {[
         [0, 5.2, -hd + 0.035, 0, w],
@@ -586,7 +583,7 @@ export function Mammals() {
       ))}
       <group>
         <mesh position={[0, 0.22, 0]} castShadow receiveShadow>
-          <cylinderGeometry args={[5.9, 6, 0.44, 72]} />
+          <cylinderGeometry args={[5.9, 6, 0.44, 28]} />
           <meshStandardMaterial color="#cdb98a" roughness={0.6} />
         </mesh>
         <group position={[0, 0.0, 0]}>
@@ -663,17 +660,17 @@ export function Mammals() {
               <meshBasicMaterial color="#fff2d0" toneMapped={false} />
             </mesh>
           ))}
-          <pointLight intensity={4} distance={9} color="#ffe2b0" />
+          {i % 2 === 0 && <pointLight intensity={7} distance={14} color="#ffe2b0" />}
         </group>
       ))}
       <SpotAt pos={[-6, h - 0.5, 7]} at={[-0.4, 2, 0.3]} intensity={320} angle={0.26} />
       <SpotAt pos={[6, h - 0.5, 5]} at={[2.6, 3.4, -2.8]} intensity={220} angle={0.24} />
-      <SpotAt pos={[0, h - 0.5, -7]} at={[-1, 1.5, 1.5]} intensity={90} angle={0.35} />
-      <SpotAt pos={[4, h - 0.5, 8]} at={[3.1, 1, 2.3]} intensity={50} angle={0.2} />
       <Panel pos={[-hw + 0.03, 2.2, -3.5]} rot={Math.PI / 2} w={1.6} h={1.1} kicker="Theme" title="Evolution" body="How mammals radiated into the forms found across Kenya today." bg="#efe2c8" fg="#2b211a" accent="#9a4a24" />
       <Panel pos={[hw - 0.03, 2.2, -3.5]} rot={-Math.PI / 2} w={1.6} h={1.1} kicker="Theme" title="Locomotion" body="Running, climbing, swimming and flying." bg="#efe2c8" fg="#2b211a" accent="#9a4a24" />
       <Panel pos={[hw - 0.03, 2.2, 4.5]} rot={-Math.PI / 2} w={1.6} h={1.1} kicker="Theme three" title="Feeding & defence" body="Feeding adaptation and defence mechanism, the third theme named by the museum." bg="#efe2c8" fg="#2b211a" accent="#9a4a24" />
-      <Frame pos={[-hw + 0.03, 2.3, 4.5]} rot={Math.PI / 2} w={2} src="/photos/great-hall-of-mammals.jpg" caption="NMK photograph" />
+      <Frame pos={[-5.4, 2.55, -hd + 0.06]} w={3.2} src="/photos/great-hall-of-mammals.jpg" caption="The Great Hall of Mammals" />
+      <Frame pos={[5.4, 2.55, -hd + 0.06]} w={3.2} src="/photos/great-hall-of-mammals.jpg" caption="NMK photograph" />
+      <Frame pos={[-hw + 0.03, 2.3, 4.5]} rot={Math.PI / 2} w={2.4} src="/photos/great-hall-of-mammals.jpg" caption="NMK photograph" />
     </IndoorShell>
   )
 }

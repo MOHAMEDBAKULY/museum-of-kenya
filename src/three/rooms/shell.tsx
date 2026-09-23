@@ -19,7 +19,6 @@ export function IndoorShell({
   envI = 0.45,
   ambient = 0.28,
   hemi = 0.55,
-  reflect = 0,
   warmth = '#ffe0b5',
   keyLight = 1.2,
   children,
@@ -37,7 +36,6 @@ export function IndoorShell({
   envI?: number
   ambient?: number
   hemi?: number
-  reflect?: number
   warmth?: string
   keyLight?: number
   children?: ReactNode
@@ -46,7 +44,7 @@ export function IndoorShell({
   const [w, d, h] = room.size
   return (
     <group>
-      <Floor w={w} d={d} url={floor} tile={floorTile} roughness={floorRough} color={floorColor} reflect={reflect} />
+      <Floor w={w} d={d} url={floor} tile={floorTile} roughness={floorRough} color={floorColor} />
       <Walls w={w} d={d} h={h} color={wall} tile={wallTile} />
       {!noCeiling && <Ceiling w={w} d={d} h={h} color={ceiling} bounce={bounce} />}
       {room.doors.map((door) => (
@@ -59,7 +57,7 @@ export function IndoorShell({
         intensity={keyLight}
         color={warmth}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-w / 2}
         shadow-camera-right={w / 2}
         shadow-camera-top={d / 2}
@@ -69,7 +67,7 @@ export function IndoorShell({
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
       />
-      <Environment resolution={128} frames={1} environmentIntensity={envI}>
+      <Environment resolution={64} frames={1} environmentIntensity={envI}>
         <Lightformer form="rect" intensity={2.2} color={warmth} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[w, d, 1]} />
         <Lightformer form="rect" intensity={0.8} color="#fff6ea" position={[0, 2, -12]} scale={[20, 4, 1]} />
         <Lightformer form="rect" intensity={0.6} color="#d9b58a" position={[12, 2, 0]} rotation-y={-Math.PI / 2} scale={[20, 4, 1]} />
@@ -99,10 +97,10 @@ export function OutdoorShell({
   const [w, d] = room.size
   const edge: { x: number; z: number }[] = []
   if (hedge) {
-    for (let x = -w / 2; x <= w / 2; x += 3.2) {
+    for (let x = -w / 2; x <= w / 2; x += 5.2) {
       edge.push({ x, z: -d / 2 - 1.2 }, { x, z: d / 2 + 1.2 })
     }
-    for (let z = -d / 2; z <= d / 2; z += 3.2) {
+    for (let z = -d / 2; z <= d / 2; z += 5.2) {
       edge.push({ x: -w / 2 - 1.2, z }, { x: w / 2 + 1.2, z })
     }
   }
@@ -127,7 +125,7 @@ export function OutdoorShell({
         intensity={2.4}
         color="#fff6e4"
         castShadow
-        shadow-mapSize={[4096, 4096]}
+        shadow-mapSize={[1024, 1024]}
         shadow-camera-left={-w / 2 - 6}
         shadow-camera-right={w / 2 + 6}
         shadow-camera-top={d / 2 + 6}
@@ -136,7 +134,7 @@ export function OutdoorShell({
         shadow-bias={-0.0004}
         shadow-normalBias={0.04}
       />
-      <Environment resolution={128} frames={1} environmentIntensity={0.3}>
+      <Environment resolution={64} frames={1} environmentIntensity={0.3}>
         <Lightformer form="rect" intensity={1.6} color="#cfe0ff" position={[0, 20, 0]} rotation-x={Math.PI / 2} scale={[60, 60, 1]} />
         <Lightformer form="circle" intensity={6} color="#fff0d6" position={sun} scale={6} />
         <Lightformer form="rect" intensity={0.6} color="#8a6f4a" position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[60, 60, 1]} />

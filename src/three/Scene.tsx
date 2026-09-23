@@ -1,7 +1,5 @@
 import { AdaptiveDpr, PerformanceMonitor, Preload } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Bloom, EffectComposer, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { ToneMappingMode } from 'postprocessing'
 import { Suspense, type ComponentType } from 'react'
 import * as THREE from 'three'
 import { ROOM_BY_ID, type RoomId } from '../data/rooms'
@@ -58,17 +56,6 @@ function FovAdapter() {
   return null
 }
 
-function Effects({ high }: { high: boolean }) {
-  return (
-    <EffectComposer multisampling={high ? 4 : 0} enableNormalPass={false}>
-      {high ? <N8AO halfRes aoRadius={0.8} intensity={1.05} distanceFalloff={0.6} quality="performance" /> : <></>}
-      <Bloom mipmapBlur luminanceThreshold={0.95} luminanceSmoothing={0.25} intensity={0.28} />
-      <Vignette offset={0.32} darkness={0.28} />
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-    </EffectComposer>
-  )
-}
-
 function World() {
   const phase = useTour((s) => s.phase)
   const roomId = useTour((s) => s.room)
@@ -95,27 +82,31 @@ function World() {
 const Q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams()
 const CLEAN = Q.has('clean')
 const FORCE_HQ = Q.has('hq')
-const NO_FX = Q.has('nofx')
 
 export function Scene() {
   const high = useTour((s) => s.quality) === 'high'
   const setQuality = useTour((s) => s.setQuality)
   return (
     <Canvas
-      shadows={high}
-      dpr={[1, high ? 1.75 : 1.5]}
+      shadows={high ? 'percentage' : false}
+      dpr={[1, high ? 1.25 : 1]}
       camera={{ fov: 55, near: 0.1, far: 400, position: [0, 1.65, 12] }}
-      gl={{ antialias: false, powerPreference: 'high-performance', toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
+      gl={{
+        antialias: false,
+        powerPreference: 'high-performance',
+        toneMapping: THREE.ACESFilmicToneMapping,
+        toneMappingExposure: 1.05,
+        outputColorSpace: THREE.SRGBColorSpace,
+      }}
       style={{ position: 'fixed', inset: 0, touchAction: 'none' }}
       onCreated={(st) => {
         if (import.meta.env.DEV) Object.assign(window, { __three: st, __live: live })
       }}
     >
-      {!FORCE_HQ && <PerformanceMonitor onDecline={() => setQuality('low')} flipflops={2} />}
+      {!FORCE_HQ && <PerformanceMonitor onDecline={() => setQuality('low')} onIncline={() => setQuality('high')} flipflops={2} />}
       {!FORCE_HQ && <AdaptiveDpr pixelated={false} />}
       <World />
       <FovAdapter />
-      {!NO_FX && <Effects high={high} />}
     </Canvas>
   )
 }
