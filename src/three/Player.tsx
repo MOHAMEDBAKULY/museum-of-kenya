@@ -213,14 +213,16 @@ export function Player() {
     const m = 0.6
     p.x = THREE.MathUtils.clamp(p.x, -w / 2 + m, w / 2 - m)
     p.y = THREE.MathUtils.clamp(p.y, -d / 2 + m, d / 2 - m)
-    for (const [ox, oz, r] of room.obstacles) {
-      const dx = p.x - ox
-      const dz = p.y - oz
-      const dist = Math.hypot(dx, dz)
-      const min = r + 0.35
-      if (dist < min && dist > 1e-4) {
-        p.x = ox + (dx / dist) * min
-        p.y = oz + (dz / dist) * min
+    if (!st.mobile) {
+      for (const [ox, oz, r] of room.obstacles) {
+        const dx = p.x - ox
+        const dz = p.y - oz
+        const dist = Math.hypot(dx, dz)
+        const min = r + 0.35
+        if (dist < min && dist > 1e-4) {
+          p.x = ox + (dx / dist) * min
+          p.y = oz + (dz / dist) * min
+        }
       }
     }
 

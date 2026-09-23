@@ -15,6 +15,9 @@ export function HUD() {
   const select = useTour((s) => s.select)
   const selected = useTour((s) => s.selected)
   const goTo = useTour((s) => s.goTo)
+  const effectsWanted = useTour((s) => s.effectsWanted)
+  const setEffectsWanted = useTour((s) => s.setEffectsWanted)
+  const mobile = useTour((s) => s.mobile)
   const room = ROOM_BY_ID[roomId]
   const i = TOUR_ORDER.indexOf(roomId)
   const next = TOUR_ORDER[(i + 1) % TOUR_ORDER.length]
@@ -55,6 +58,16 @@ export function HUD() {
           <button onClick={() => setMode(mode === 'walk' ? 'orbit' : 'walk')} className="glass rounded-full px-3.5 py-2 text-xs text-bone sm:hidden" aria-label="Toggle walk or orbit">
             {mode === 'walk' ? 'Orbit' : 'Walk'}
           </button>
+          {!mobile && (
+            <button
+              onClick={() => setEffectsWanted(!effectsWanted)}
+              className={`glass hidden rounded-full px-3.5 py-2 text-xs sm:block ${effectsWanted ? 'text-bone' : 'text-bone/70'}`}
+              aria-pressed={effectsWanted}
+              aria-label="Bloom and ambient occlusion"
+            >
+              Effects
+            </button>
+          )}
           <button onClick={() => setHelp(!helpOpen)} className="glass hidden h-9 w-9 rounded-full text-sm text-bone sm:block" aria-label="Controls help">
             ?
           </button>

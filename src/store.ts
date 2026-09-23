@@ -19,8 +19,21 @@ type TourState = {
   titleCard: boolean
   menuOpen: boolean
   helpOpen: boolean
-  quality: 'high' | 'low'
-  setQuality: (q: 'high' | 'low') => void
+  /** Phone-sized pointer. Forces low detail, no post, half-size shadows. */
+  mobile: boolean
+  /** 0 full, 1 drop shadows, 2 drop post, 3 drop LOD. PerformanceMonitor walks this. */
+  step: 0 | 1 | 2 | 3
+  /** Visitor asked for bloom and ambient occlusion. Off unless this or ?hq. */
+  effectsWanted: boolean
+  shadows: boolean
+  effects: boolean
+  lod: 'high' | 'low'
+  /** Heavy dressing (gourds, herds, hedges) waits until after the shell paints. */
+  dressing: boolean
+  setEffectsWanted: (on: boolean) => void
+  decline: () => void
+  incline: () => void
+  setDressing: (on: boolean) => void
   setPhase: (p: Phase) => void
   goTo: (id: RoomId) => void
   select: (id: string | null) => void
@@ -58,6 +71,17 @@ function fromUrl(): { room: RoomId; spawn: Spawn } | null {
 
 const initial = fromUrl()
 
+const mobile = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+const effectsWanted = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('hq') && !mobile
+
+function derive(step: 0 | 1 | 2 | 3, want: boolean, phone: boolean) {
+  return {
+    shadows: step < 1,
+    effects: want && step < 2 && !phone,
+    lod: step >= 3 || phone ? ('low' as const) : ('high' as const),
+  }
+}
+
 export const useTour = create<TourState>((set, get) => ({
   phase: initial ? 'tour' : 'intro',
   room: initial?.room ?? 'forecourt',
@@ -71,8 +95,21 @@ export const useTour = create<TourState>((set, get) => ({
   titleCard: false,
   menuOpen: false,
   helpOpen: false,
-  quality: typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches && !location.search.includes('hq') ? 'low' : 'high',
-  setQuality: (quality) => set({ quality }),
+  mobile,
+  step: 0,
+  effectsWanted,
+  dressing: false,
+  ...derive(0, effectsWanted, mobile),
+  setEffectsWanted: (on) => set((s) => ({ effectsWanted: on, step: on ? 0 : s.step, ...derive(on ? 0 : s.step, on, s.mobile) })),
+  decline: () => set((s) => {
+    const step = Math.min(3, s.step + 1) as 0 | 1 | 2 | 3
+    return { step, ...derive(step, s.effectsWanted, s.mobile) }
+  }),
+  incline: () => set((s) => {
+    const step = Math.max(0, s.step - 1) as 0 | 1 | 2 | 3
+    return { step, ...derive(step, s.effectsWanted, s.mobile) }
+  }),
+  setDressing: (dressing) => set({ dressing }),
   setPhase: (phase) => set({ phase }),
   goTo: (id) => {
     const s = get()

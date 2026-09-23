@@ -1,30 +1,24 @@
-import { AdaptiveDpr, PerformanceMonitor, Preload } from '@react-three/drei'
+import { AdaptiveDpr, PerformanceMonitor } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Suspense, type ComponentType } from 'react'
+import { Bloom, EffectComposer, N8AO } from '@react-three/postprocessing'
+import { lazy, Suspense, useEffect, useState, type ComponentType, type LazyExoticComponent } from 'react'
 import * as THREE from 'three'
 import { ROOM_BY_ID, type RoomId } from '../data/rooms'
 import { live, useTour } from '../store'
 import { Hotspots } from './Hotspots'
 import { OrbitRig, Player } from './Player'
-import { AsianAfrican, Birds, Cradle, Creativity, HallOfKenya, Mammals, Numismatic } from './rooms/GroundFloor'
-import { Courtyard, Forecourt, Gardens, SnakePark } from './rooms/Grounds'
-import { Cycles, Historia, JoyAdamson } from './rooms/UpperFloor'
+import { RoomActiveContext } from './roomActive'
+import { roomLoaders } from './roomLoad'
 
-const SCENES: Record<RoomId, ComponentType> = {
-  forecourt: Forecourt,
-  'hall-of-kenya': HallOfKenya,
-  birds: Birds,
-  mammals: Mammals,
-  cradle: Cradle,
-  'asian-african': AsianAfrican,
-  numismatic: Numismatic,
-  creativity: Creativity,
-  historia: Historia,
-  cycles: Cycles,
-  'joy-adamson': JoyAdamson,
-  courtyard: Courtyard,
-  'snake-park': SnakePark,
-  gardens: Gardens,
+const lazyCache = new Map<RoomId, LazyExoticComponent<ComponentType>>()
+
+function lazyRoom(id: RoomId) {
+  let cached = lazyCache.get(id)
+  if (!cached) {
+    cached = lazy(() => roomLoaders[id]().then((Comp) => ({ default: Comp })))
+    lazyCache.set(id, cached)
+  }
+  return cached
 }
 
 export const isCoarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
@@ -56,41 +50,127 @@ function FovAdapter() {
   return null
 }
 
-function World() {
+/** Stop the render loop while the tab is in the background. */
+function PauseWhenHidden() {
+  const set = useThree((s) => s.set)
+  useEffect(() => {
+    const onVis = () => set({ frameloop: document.hidden ? 'never' : 'always' })
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [set])
+  return null
+}
+
+function ShellFallback({ id }: { id: RoomId }) {
+  const room = ROOM_BY_ID[id]
+  const [w, d] = room.size
+  return (
+    <mesh rotation-x={-Math.PI / 2} position={[0, 0, 0]}>
+      <planeGeometry args={[w, d]} />
+      <meshBasicMaterial color={room.outdoor ? '#c4a882' : '#e6d3b4'} />
+    </mesh>
+  )
+}
+
+function later(cb: () => void, ms: number) {
+  if (typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(cb, { timeout: ms + 500 })
+    return () => window.cancelIdleCallback(id)
+  }
+  const id = window.setTimeout(cb, ms)
+  return () => window.clearTimeout(id)
+}
+
+/**
+ * The current room paints immediately. Neighbor rooms are fetched after that
+ * paint and mounted hidden so their meshes exist, then dropped when you leave
+ * the neighborhood. The other galleries are not in the scene.
+ */
+function RoomStage() {
   const phase = useTour((s) => s.phase)
   const roomId = useTour((s) => s.room)
   const mode = useTour((s) => s.mode)
-  const shownId: RoomId = phase === 'tour' ? roomId : 'forecourt'
-  const Room = SCENES[shownId]
-  const room = ROOM_BY_ID[shownId]
+  const setDressing = useTour((s) => s.setDressing)
+  const shown: RoomId = phase === 'tour' ? roomId : 'forecourt'
+  const room = ROOM_BY_ID[shown]
+  const neighbors = room.doors.map((d) => d.to)
+  const [ready, setReady] = useState<RoomId[]>([])
+
+  useEffect(() => {
+    setDressing(false)
+    setReady([])
+    let cancel = false
+    let cancelPump = () => {}
+    const queue = [...neighbors]
+    const pump = () => {
+      const id = queue.shift()
+      if (!id || cancel) return
+      void roomLoaders[id]().then(() => {
+        if (cancel) return
+        setReady((have) => (have.includes(id) ? have : [...have, id]))
+        cancelPump = later(pump, 450)
+      })
+    }
+    const cancelDress = later(() => {
+      if (cancel) return
+      setDressing(true)
+      cancelPump = later(pump, 400)
+    }, 160)
+    return () => {
+      cancel = true
+      cancelDress()
+      cancelPump()
+    }
+    // neighbors is derived from shown
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, setDressing])
+
+  const mounted = [shown, ...ready.filter((id) => neighbors.includes(id))]
   return (
     <>
       <color attach="background" args={[room.outdoor ? '#9fc3ea' : '#0b0a09']} />
       {!room.outdoor && <fog attach="fog" args={['#1a140f', 18, 60]} />}
-      <Suspense fallback={null}>
-        <group key={shownId}>
-          <Room />
-          {phase === 'tour' && !CLEAN && <Hotspots room={room} />}
-        </group>
-        <Preload all />
-      </Suspense>
+      {mounted.map((id) => {
+        const Room = lazyRoom(id)
+        const active = id === shown
+        return (
+          <group key={id} visible={active}>
+            <RoomActiveContext.Provider value={active}>
+              <Suspense fallback={active ? <ShellFallback id={id} /> : null}>
+                <Room />
+                {active && phase === 'tour' && !CLEAN && <Hotspots room={ROOM_BY_ID[id]} />}
+              </Suspense>
+            </RoomActiveContext.Provider>
+          </group>
+        )
+      })}
       {phase !== 'tour' ? <Drift /> : mode === 'walk' ? <Player /> : <OrbitRig />}
     </>
   )
 }
 
+function Effects() {
+  return (
+    <EffectComposer multisampling={0} enableNormalPass={false}>
+      <N8AO halfRes aoRadius={0.55} intensity={0.7} distanceFalloff={0.5} quality="performance" />
+      <Bloom mipmapBlur luminanceThreshold={0.92} luminanceSmoothing={0.2} intensity={0.18} />
+    </EffectComposer>
+  )
+}
+
 const Q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams()
 const CLEAN = Q.has('clean')
-const FORCE_HQ = Q.has('hq')
 
 export function Scene() {
-  const high = useTour((s) => s.quality) === 'high'
-  const setQuality = useTour((s) => s.setQuality)
+  const shadows = useTour((s) => s.shadows)
+  const effects = useTour((s) => s.effects)
+  const decline = useTour((s) => s.decline)
+  const incline = useTour((s) => s.incline)
   return (
     <Canvas
-      shadows={high ? 'percentage' : false}
-      dpr={[1, high ? 1.25 : 1]}
-      camera={{ fov: 55, near: 0.1, far: 400, position: [0, 1.65, 12] }}
+      shadows={shadows ? 'percentage' : false}
+      dpr={[1, 1.5]}
+      camera={{ fov: 55, near: 0.1, far: 280, position: [0, 1.65, 12] }}
       gl={{
         antialias: false,
         powerPreference: 'high-performance',
@@ -103,10 +183,12 @@ export function Scene() {
         if (import.meta.env.DEV) Object.assign(window, { __three: st, __live: live })
       }}
     >
-      {!FORCE_HQ && <PerformanceMonitor onDecline={() => setQuality('low')} onIncline={() => setQuality('high')} flipflops={2} />}
-      {!FORCE_HQ && <AdaptiveDpr pixelated={false} />}
-      <World />
+      <PerformanceMonitor onDecline={decline} onIncline={incline} flipflops={3} />
+      <AdaptiveDpr pixelated={false} />
+      <PauseWhenHidden />
+      <RoomStage />
       <FovAdapter />
+      {effects && <Effects />}
     </Canvas>
   )
 }

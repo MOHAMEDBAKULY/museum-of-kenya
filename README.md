@@ -27,7 +27,7 @@ Other scripts: `npm run build` (type-check and production build), `npm run previ
 
 The minimap (bottom left) shows the current room, its exhibits and its exits. The chip bar (bottom centre) lists every exhibit and links to the next room. The **Map** opens the hub, which has a schematic plan of all 14 spaces, a gallery list and a "Plan a visit" tab with hours and 2026 ticket prices.
 
-Deep links open a room directly: `/?room=mammals`, or `/?room=hall-of-kenya&at=0,9,0,0.16` to set the position (x, z), heading and pitch. Add `&clean` to hide the UI and `&hq` to keep full quality on slow GPUs.
+Deep links open a room directly: `/?room=mammals`, or `/?room=hall-of-kenya&at=0,9,0,0.16` to set the position (x, z), heading and pitch. Add `&clean` to hide the UI. Bloom and ambient occlusion stay off unless you add `&hq` or press **Effects** (desktop). The canvas pauses while the tab is hidden, and the pixel ratio stays between 1 and 1.5. Only the current room and its neighbours are mounted; the rest of the galleries load when you walk toward them.
 
 ## Rooms
 
@@ -61,7 +61,7 @@ The list follows the permanent galleries named on [museums.or.ke](https://museum
 ## Known gaps
 
 - No NMK photographs were available for the Joy Adamson Gallery, Numismatic Exhibition, Asian African Heritage gallery, Ahmed's courtyard or the Botanic Gardens. Those rooms are built from written descriptions only.
-- There are no 3D scans or models of the real exhibits. Animals, including the buffalo and warthog from the museum's mammals-hall photograph, and the Turkana Boy skeleton are photographic cut-outs that turn to face the visitor. Trees, gourds, columns and cases are modelled in code. That is the ceiling on how photographic the hero rooms can look.
+- There are no 3D scans or models of the real exhibits. Animals, including the buffalo and warthog from the museum's mammals-hall photograph, and the Turkana Boy skeleton are photographic cut-outs facing the south entrance. Trees, gourds, columns and cases are modelled in code. That is the ceiling on how photographic the hero rooms can look. No Meshy key and no Blender connection were available to replace those cut-outs.
 - Layouts, dimensions and some fittings are informed approximations drawn from photographs and guides.
 
 ## Project layout

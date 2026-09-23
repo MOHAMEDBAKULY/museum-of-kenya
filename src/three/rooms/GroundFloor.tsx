@@ -1,11 +1,16 @@
 import { Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useContext, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { ROOM_BY_ID } from '../../data/rooms'
-import { Blob, Column, Cutout, FONT, Frame, Panel, RoundPlinth, Shrub, SpotAt, Vitrine, WallCase } from '../kit'
+import { useTour } from '../../store'
+import { Blob, ColumnRow, Cutout, FONT, Frame, Panel, RoundPlinth, ShrubField, SpotAt, Vitrine, WallCase } from '../kit'
 import { TEX, useImage } from '../tex'
+import { RoomActiveContext } from '../roomActive'
 import { IndoorShell } from './shell'
+
+const TRACK_BODY = new THREE.CylinderGeometry(0.05, 0.06, 0.18, 6)
+const TRACK_LENS = new THREE.CircleGeometry(0.045, 8)
 
 function rng(seed: number) {
   let s = seed
@@ -40,7 +45,8 @@ function Calabashes() {
   const heap = useRef<THREE.InstancedMesh>(null)
   const strings = useRef<THREE.InstancedMesh>(null)
   const geo = useMemo(gourdGeometry, [])
-  const HEAP = 360
+  const lod = useTour((s) => s.lod)
+  const HEAP = lod === 'low' ? 80 : 160
   const ROPES = 14
   const PER = 6
   const ladleY = 5.35
@@ -95,7 +101,7 @@ function Calabashes() {
       strings.current.instanceMatrix.needsUpdate = true
       if (strings.current.instanceColor) strings.current.instanceColor.needsUpdate = true
     }
-  }, [ropes])
+  }, [ropes, HEAP])
   const ropeGeos = useMemo(() => ropes.map((rp) => new THREE.TubeGeometry(new THREE.LineCurve3(rp.bottom, rp.top), 1, 0.012, 5, false)), [ropes])
   const ropeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#6a5139', roughness: 0.9 }), [])
   const ladle = useRef<THREE.Group>(null)
@@ -136,33 +142,49 @@ function Calabashes() {
         </mesh>
       </group>
       <SpotAt pos={[-5, 10.5, 7]} at={[0, 2.2, 0]} intensity={240} angle={0.3} />
-      <SpotAt pos={[5, 10.5, 6]} at={[0, 3.6, 0]} intensity={170} angle={0.3} />
+      {lod === 'high' && <SpotAt pos={[5, 10.5, 6]} at={[0, 3.6, 0]} intensity={170} angle={0.3} />}
       <Blob pos={[0, 0, 0]} size={[7.5, 7.5]} />
     </group>
   )
 }
 
 function TrackLights({ x, from, to, y, step = 2 }: { x: number; from: number; to: number; y: number; step?: number }) {
-  const zs: number[] = []
-  for (let z = from; z <= to; z += step) zs.push(z)
+  const zs = useMemo(() => {
+    const out: number[] = []
+    for (let z = from; z <= to + 1e-4; z += step) out.push(z)
+    return out
+  }, [from, to, step])
+  const body = useRef<THREE.InstancedMesh>(null)
+  const lens = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const b = body.current
+    const l = lens.current
+    if (!b || !l) return
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.5, 0, 0))
+    const qLens = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0))
+    const parent = new THREE.Matrix4()
+    const local = new THREE.Matrix4()
+    zs.forEach((z, i) => {
+      parent.compose(new THREE.Vector3(x, y - 0.1, z), q, new THREE.Vector3(1, 1, 1))
+      b.setMatrixAt(i, parent)
+      local.compose(new THREE.Vector3(0, -0.091, 0), qLens, new THREE.Vector3(1, 1, 1))
+      l.setMatrixAt(i, parent.clone().multiply(local))
+    })
+    b.instanceMatrix.needsUpdate = true
+    l.instanceMatrix.needsUpdate = true
+  }, [zs, x, y])
   return (
     <group>
       <mesh position={[x, y + 0.03, (from + to) / 2]}>
-        <boxGeometry args={[0.05, 0.03, to - from + 0.6]} />
-        <meshStandardMaterial color="#1b1814" />
+        <boxGeometry args={[0.05, 0.03, Math.abs(to - from) + 0.6]} />
+        <meshLambertMaterial color="#1b1814" />
       </mesh>
-      {zs.map((z) => (
-        <group key={z} position={[x, y - 0.1, z]} rotation-x={0.5}>
-          <mesh>
-            <cylinderGeometry args={[0.05, 0.06, 0.18, 10]} />
-            <meshStandardMaterial color="#1b1814" metalness={0.5} roughness={0.4} />
-          </mesh>
-          <mesh position={[0, -0.091, 0]} rotation-x={Math.PI / 2}>
-            <circleGeometry args={[0.045, 12]} />
-            <meshBasicMaterial color="#fff1cf" toneMapped={false} />
-          </mesh>
-        </group>
-      ))}
+      <instancedMesh ref={body} args={[TRACK_BODY, undefined, Math.max(1, zs.length)]}>
+        <meshLambertMaterial color="#1b1814" />
+      </instancedMesh>
+      <instancedMesh ref={lens} args={[TRACK_LENS, undefined, Math.max(1, zs.length)]}>
+        <meshBasicMaterial color="#fff1cf" toneMapped={false} />
+      </instancedMesh>
     </group>
   )
 }
@@ -263,18 +285,19 @@ function ArchWindow({ pos, rot, w = 1.4, h = 1.8, color = '#fff4de', intensity =
 
 export function HallOfKenya() {
   const room = ROOM_BY_ID['hall-of-kenya']
+  const dressing = useTour((s) => s.dressing)
+  const lod = useTour((s) => s.lod)
+  const active = useContext(RoomActiveContext)
   const [w, d, h] = room.size
   const M = 5
   const hw = w / 2
   const cols = [-10, -6, -2, 2, 6, 10]
   return (
     <IndoorShell room={room} floor={TEX.parquet} floorTile={2.2} floorColor="#f0c2a4" floorRough={0.28} wall="#f7f3ea" ceiling="#f7f3ea" bounce={0.62} ambient={0.16} hemi={0.28} keyLight={1.15} envI={0.55} warmth="#ffe4c2">
-      <Calabashes />
+      <Suspense fallback={null}>{active && dressing && <Calabashes />}</Suspense>
+      <ColumnRow positions={([-1, 1] as const).flatMap((s) => cols.map((z) => [s * 6.5, 0, z] as [number, number, number]))} h={M} r={0.3} />
       {[-1, 1].map((s) => (
         <group key={s}>
-          {cols.map((z) => (
-            <Column key={z} pos={[s * 6.5, 0, z]} h={M} r={0.3} />
-          ))}
           <mesh position={[s * (6.5 + (hw - 6.5) / 2 - 0.35), M + 0.25, 0]} castShadow receiveShadow>
             <boxGeometry args={[hw - 6.5 + 0.7, 0.5, d]} />
             <meshStandardMaterial color="#f1ebe0" roughness={0.7} emissive="#f1ebe0" emissiveIntensity={0.28} />
@@ -291,7 +314,7 @@ export function HallOfKenya() {
             <boxGeometry args={[0.08, 0.02, d - 1]} />
             <meshStandardMaterial color="#20170f" />
           </mesh>
-          <pointLight position={[s * 8.8, M - 0.4, 0]} intensity={8} distance={16} color="#ffd6a0" />
+          {lod === 'high' && <pointLight position={[s * 8.8, M - 0.4, 0]} intensity={8} distance={16} color="#ffd6a0" />}
           <TrackLights x={s * 6.15} from={-13} to={13} y={M - 0.15} step={2.6} />
         </group>
       ))}
@@ -541,9 +564,13 @@ function Rocks({ r }: { r: number }) {
           <meshStandardMaterial color={i % 2 ? '#6e6254' : '#8a7560'} roughness={0.96} />
         </mesh>
       ))}
-      {list.slice(0, 10).map((k, i) => (
-        <Shrub key={`g${i}`} pos={[k.p[0] * 0.8 + 0.4, 0.55, k.p[2] * 0.8 - 0.3]} scale={0.22} seed={200 + i} color="#8a7a3e" />
-      ))}
+      <ShrubField
+        points={list.slice(0, 10).map((k) => ({
+          pos: [k.p[0] * 0.8 + 0.4, 0.55, k.p[2] * 0.8 - 0.3],
+          scale: 0.22,
+          color: '#8a7a3e',
+        }))}
+      />
       {list.slice(0, 14).map((k, i) => (
         <mesh key={`grass${i}`} position={[k.p[0] * 0.65, 0.7, k.p[2] * 0.65]} rotation-z={(i % 5) * 0.2 - 0.4}>
           <coneGeometry args={[0.05, 0.42, 4]} />
@@ -556,6 +583,8 @@ function Rocks({ r }: { r: number }) {
 
 export function Mammals() {
   const room = ROOM_BY_ID.mammals
+  const dressing = useTour((s) => s.dressing)
+  const active = useContext(RoomActiveContext)
   const [w, d, h] = room.size
   const hw = w / 2
   const hd = d / 2
@@ -589,13 +618,19 @@ export function Mammals() {
         <group position={[0, 0.0, 0]}>
           <RoundPlinth r={5.4} h={0.55} rail={false} />
         </group>
-        <Rocks r={5} />
-        <Cutout src="/cutouts/giraffe.webp" pos={[1.6, 0.62, -2.7]} height={5.2} />
-        <Cutout src="/cutouts/elephant.webp" pos={[-0.5, 0.62, -0.15]} height={3.8} flip />
-        <Cutout src="/cutouts/zebra.webp" pos={[-2.7, 0.62, 1.15]} height={1.55} flip />
-        <Cutout src="/cutouts/buffalo.webp" pos={[2.7, 0.62, 0.45]} height={2.05} />
-        <Cutout src="/cutouts/impala.webp" pos={[-0.15, 0.62, 2.05]} height={1.25} />
-        <Cutout src="/cutouts/warthog.webp" pos={[1.55, 0.62, 2.25]} height={0.88} />
+        <Suspense fallback={null}>
+          {active && dressing && (
+            <>
+              <Rocks r={5} />
+              <Cutout src="/cutouts/giraffe.webp" pos={[1.6, 0.62, -2.7]} height={5.2} />
+              <Cutout src="/cutouts/elephant.webp" pos={[-0.5, 0.62, -0.15]} height={3.8} flip />
+              <Cutout src="/cutouts/zebra.webp" pos={[-2.7, 0.62, 1.15]} height={1.55} flip />
+              <Cutout src="/cutouts/buffalo.webp" pos={[2.7, 0.62, 0.45]} height={2.05} />
+              <Cutout src="/cutouts/impala.webp" pos={[-0.15, 0.62, 2.05]} height={1.25} />
+              <Cutout src="/cutouts/warthog.webp" pos={[1.55, 0.62, 2.25]} height={0.88} />
+            </>
+          )}
+        </Suspense>
         <group position={[0, 0, 6.5]}>
           <mesh position={[0, 0.5, 0]} rotation-x={-0.35} castShadow>
             <boxGeometry args={[1.6, 0.9, 0.5]} />

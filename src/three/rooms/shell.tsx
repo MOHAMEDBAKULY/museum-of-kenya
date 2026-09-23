@@ -1,10 +1,38 @@
 import { Environment, Lightformer } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useContext, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { ReactNode } from 'react'
 import type { Room } from '../../data/rooms'
-import { Ceiling, Doorway, Floor, Shrub, Tree, Walls } from '../kit'
+import { useTour } from '../../store'
+import { RoomActiveContext } from '../roomActive'
+import { Ceiling, Doorway, Floor, Tree, Walls } from '../kit'
 import { TEX } from '../tex'
+
+const HEDGE_GEO = new THREE.IcosahedronGeometry(1, 0)
+
+function Hedge({ points }: { points: { x: number; z: number; s: number; c: string }[] }) {
+  const ref = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    const m = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const color = new THREE.Color()
+    points.forEach((p, i) => {
+      m.compose(new THREE.Vector3(p.x, 0.45 * p.s, p.z), q, new THREE.Vector3(p.s * 1.2, p.s * 0.8, p.s * 1.1))
+      mesh.setMatrixAt(i, m)
+      mesh.setColorAt(i, color.set(p.c))
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }, [points])
+  if (points.length === 0) return null
+  return (
+    <instancedMesh ref={ref} args={[HEDGE_GEO, undefined, points.length]} frustumCulled={false}>
+      <meshLambertMaterial />
+    </instancedMesh>
+  )
+}
 
 export function IndoorShell({
   room,
@@ -42,6 +70,12 @@ export function IndoorShell({
   noCeiling?: boolean
 }) {
   const [w, d, h] = room.size
+  const shadows = useTour((s) => s.shadows)
+  const dressing = useTour((s) => s.dressing)
+  const lod = useTour((s) => s.lod)
+  const mobile = useTour((s) => s.mobile)
+  const shadowRes = mobile || lod === 'low' ? 512 : 1024
+  const active = useContext(RoomActiveContext)
   return (
     <group>
       <Floor w={w} d={d} url={floor} tile={floorTile} roughness={floorRough} color={floorColor} />
@@ -56,8 +90,8 @@ export function IndoorShell({
         position={[w * 0.18, h * 2.2, d * 0.3]}
         intensity={keyLight}
         color={warmth}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={shadows}
+        shadow-mapSize={[shadowRes, shadowRes]}
         shadow-camera-left={-w / 2}
         shadow-camera-right={w / 2}
         shadow-camera-top={d / 2}
@@ -67,11 +101,13 @@ export function IndoorShell({
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
       />
-      <Environment resolution={64} frames={1} environmentIntensity={envI}>
-        <Lightformer form="rect" intensity={2.2} color={warmth} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[w, d, 1]} />
-        <Lightformer form="rect" intensity={0.8} color="#fff6ea" position={[0, 2, -12]} scale={[20, 4, 1]} />
-        <Lightformer form="rect" intensity={0.6} color="#d9b58a" position={[12, 2, 0]} rotation-y={-Math.PI / 2} scale={[20, 4, 1]} />
-      </Environment>
+      {active && dressing && lod === 'high' && (
+        <Environment resolution={64} frames={1} environmentIntensity={envI}>
+          <Lightformer form="rect" intensity={2.2} color={warmth} position={[0, 6, 0]} rotation-x={Math.PI / 2} scale={[w, d, 1]} />
+          <Lightformer form="rect" intensity={0.8} color="#fff6ea" position={[0, 2, -12]} scale={[20, 4, 1]} />
+          <Lightformer form="rect" intensity={0.6} color="#d9b58a" position={[12, 2, 0]} rotation-y={-Math.PI / 2} scale={[20, 4, 1]} />
+        </Environment>
+      )}
       {children}
     </group>
   )
@@ -95,6 +131,12 @@ export function OutdoorShell({
   sun?: [number, number, number]
 }) {
   const [w, d] = room.size
+  const shadows = useTour((s) => s.shadows)
+  const dressing = useTour((s) => s.dressing)
+  const lod = useTour((s) => s.lod)
+  const mobile = useTour((s) => s.mobile)
+  const shadowRes = mobile || lod === 'low' ? 512 : 1024
+  const active = useContext(RoomActiveContext)
   const edge: { x: number; z: number }[] = []
   if (hedge) {
     for (let x = -w / 2; x <= w / 2; x += 5.2) {
@@ -124,8 +166,8 @@ export function OutdoorShell({
         position={sun}
         intensity={2.4}
         color="#fff6e4"
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={shadows}
+        shadow-mapSize={[shadowRes, shadowRes]}
         shadow-camera-left={-w / 2 - 6}
         shadow-camera-right={w / 2 + 6}
         shadow-camera-top={d / 2 + 6}
@@ -134,20 +176,25 @@ export function OutdoorShell({
         shadow-bias={-0.0004}
         shadow-normalBias={0.04}
       />
-      <Environment resolution={64} frames={1} environmentIntensity={0.3}>
-        <Lightformer form="rect" intensity={1.6} color="#cfe0ff" position={[0, 20, 0]} rotation-x={Math.PI / 2} scale={[60, 60, 1]} />
-        <Lightformer form="circle" intensity={6} color="#fff0d6" position={sun} scale={6} />
-        <Lightformer form="rect" intensity={0.6} color="#8a6f4a" position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[60, 60, 1]} />
-      </Environment>
+      {active && dressing && lod === 'high' && (
+        <Environment resolution={64} frames={1} environmentIntensity={0.3}>
+          <Lightformer form="rect" intensity={1.6} color="#cfe0ff" position={[0, 20, 0]} rotation-x={Math.PI / 2} scale={[60, 60, 1]} />
+          <Lightformer form="circle" intensity={6} color="#fff0d6" position={sun} scale={6} />
+          <Lightformer form="rect" intensity={0.6} color="#8a6f4a" position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[60, 60, 1]} />
+        </Environment>
+      )}
       {room.doors.map((door) => (
         <Doorway key={door.to + door.wall} room={room} door={door} outdoor />
       ))}
-      {edge
-        .filter((p) => !nearDoor(p.x, p.z))
-        .map((p, i) => (
-          <Shrub key={i} pos={[p.x, 0, p.z]} scale={1.3 + ((i * 37) % 10) / 20} seed={i + 7} color={i % 3 ? '#4f7a31' : '#5f8a3b'} />
-        ))}
-      {hedge &&
+      {active && dressing && (
+        <Hedge
+          points={edge
+            .filter((p) => !nearDoor(p.x, p.z))
+            .filter((_, i) => lod === 'high' || i % 2 === 0)
+            .map((p, i) => ({ x: p.x, z: p.z, s: 1.3 + ((i * 37) % 10) / 20, c: i % 3 ? '#4f7a31' : '#5f8a3b' }))}
+        />
+      )}
+      {active && dressing && hedge &&
         [
           [-w / 2 - 5, -d / 2 - 4],
           [w / 2 + 6, -d / 2 - 3],

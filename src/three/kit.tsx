@@ -1,6 +1,6 @@
-import { Billboard, Text } from '@react-three/drei'
+import { Text } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { ROOM_BY_ID, doorPlacement, type Door as DoorT, type Room } from '../data/rooms'
 import { live, useTour } from '../store'
@@ -449,8 +449,8 @@ export function Blob({ pos, size }: { pos: V3; size: [number, number] }) {
 }
 
 /**
- * A photographic cut-out (specimen, animal) standing on the ground. It turns on its
- * vertical axis to keep facing the visitor, which reads as solid from normal viewpoints.
+ * A photographic cut-out standing on the ground, facing the south entrance (+Z).
+ * It does not turn to follow the camera.
  */
 export function Cutout({ src, pos, height, flip = false, shadow = true, tint = '#ffffff' }: { src: string; pos: V3; height: number; flip?: boolean; shadow?: boolean; tint?: string }) {
   const map = useImage(src)
@@ -458,13 +458,61 @@ export function Cutout({ src, pos, height, flip = false, shadow = true, tint = '
   const width = (height * img.width) / img.height
   return (
     <group position={pos}>
-      <Billboard lockX lockZ>
-        <mesh position={[0, height / 2, 0]} scale={[flip ? -1 : 1, 1, 1]} castShadow>
-          <planeGeometry args={[width, height]} />
-          <meshStandardMaterial map={map} alphaTest={0.35} side={THREE.DoubleSide} roughness={0.72} color={tint} emissive="#fff6ea" emissiveMap={map} emissiveIntensity={0.16} />
-        </mesh>
-      </Billboard>
+      <mesh position={[0, height / 2, 0]} scale={[flip ? -1 : 1, 1, 1]} castShadow>
+        <planeGeometry args={[width, height]} />
+        <meshStandardMaterial map={map} alphaTest={0.35} side={THREE.DoubleSide} roughness={0.72} color={tint} emissive="#fff6ea" emissiveMap={map} emissiveIntensity={0.16} />
+      </mesh>
       {shadow && <Blob pos={[0, 0, 0]} size={[width * 0.9, Math.min(width, height) * 0.45]} />}
+    </group>
+  )
+}
+
+const COL_MAT = new THREE.MeshLambertMaterial({ color: '#f4efe6' })
+
+/** One draw call per column part, for a row of identical shafts. */
+export function ColumnRow({ positions, h, r = 0.34 }: { positions: V3[]; h: number; r?: number }) {
+  const n = positions.length
+  const base = useRef<THREE.InstancedMesh>(null)
+  const ring = useRef<THREE.InstancedMesh>(null)
+  const shaft = useRef<THREE.InstancedMesh>(null)
+  const cap = useRef<THREE.InstancedMesh>(null)
+  const top = useRef<THREE.InstancedMesh>(null)
+  const geos = useMemo(
+    () => ({
+      base: new THREE.BoxGeometry(r * 2.7, 0.24, r * 2.7),
+      ring: new THREE.CylinderGeometry(r * 1.18, r * 1.25, 0.14, 10),
+      shaft: new THREE.CylinderGeometry(r * 0.9, r, Math.max(0.2, h - 0.7), 10),
+      cap: new THREE.CylinderGeometry(r * 1.25, r * 0.92, 0.2, 10),
+      top: new THREE.BoxGeometry(r * 2.8, 0.2, r * 2.8),
+    }),
+    [h, r],
+  )
+  useLayoutEffect(() => {
+    const m = new THREE.Matrix4()
+    const parts: [THREE.InstancedMesh | null, number][] = [
+      [base.current, 0.12],
+      [ring.current, 0.3],
+      [shaft.current, h / 2],
+      [cap.current, h - 0.3],
+      [top.current, h - 0.1],
+    ]
+    for (const [mesh, y] of parts) {
+      if (!mesh) continue
+      positions.forEach((p, i) => {
+        m.makeTranslation(p[0], p[1] + y, p[2])
+        mesh.setMatrixAt(i, m)
+      })
+      mesh.instanceMatrix.needsUpdate = true
+    }
+  }, [positions, h])
+  if (n === 0) return null
+  return (
+    <group>
+      <instancedMesh ref={base} args={[geos.base, COL_MAT, n]} castShadow receiveShadow />
+      <instancedMesh ref={ring} args={[geos.ring, COL_MAT, n]} castShadow />
+      <instancedMesh ref={shaft} args={[geos.shaft, COL_MAT, n]} castShadow receiveShadow />
+      <instancedMesh ref={cap} args={[geos.cap, COL_MAT, n]} castShadow />
+      <instancedMesh ref={top} args={[geos.top, COL_MAT, n]} castShadow />
     </group>
   )
 }
@@ -559,7 +607,7 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
       out.push({
         p: [Math.cos(a) * d, y, Math.sin(a) * d],
         s: kind === 'acacia' ? [sz * 1.4, sz * 0.42, sz * 1.4] : [sz, sz * 0.85, sz],
-        g: jitter(new THREE.IcosahedronGeometry(1, 1), 0.28, seed * 31 + i),
+        g: jitter(new THREE.IcosahedronGeometry(1, 0), 0.28, seed * 31 + i),
       })
     }
     return out
@@ -574,9 +622,9 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
         {Array.from({ length: 9 }).map((_, i) => {
           const a = (i / 9) * Math.PI * 2
           return (
-            <mesh key={i} position={[Math.cos(a) * 0.9, 3.1, Math.sin(a) * 0.9]} rotation={[0, -a, 0.55]} castShadow>
+            <mesh key={i} position={[Math.cos(a) * 0.9, 3.1, Math.sin(a) * 0.9]} rotation={[0, -a, 0.55]}>
               <boxGeometry args={[2, 0.03, 0.42]} />
-              <meshStandardMaterial map={leaf} color="#5f8a3a" roughness={0.8} side={THREE.DoubleSide} />
+              <meshLambertMaterial map={leaf} color="#5f8a3a" side={THREE.DoubleSide} />
             </mesh>
           )
         })}
@@ -597,21 +645,49 @@ export function Tree({ pos, scale = 1, kind = 'broad', seed = 1 }: { pos: V3; sc
           </mesh>
         ))}
       {clumps.map((c, i) => (
-        <mesh key={i} position={c.p} scale={c.s} geometry={c.g} receiveShadow>
-          <meshStandardMaterial map={leaf} color={kind === 'acacia' ? '#6f8f3c' : '#4f7a34'} roughness={0.9} flatShading />
+        <mesh key={i} position={c.p} scale={c.s} geometry={c.g}>
+          <meshLambertMaterial map={leaf} color={kind === 'acacia' ? '#6f8f3c' : '#4f7a34'} flatShading />
         </mesh>
       ))}
     </group>
   )
 }
 
-export function Shrub({ pos, scale = 1, seed = 3, color = '#557f36' }: { pos: V3; scale?: number; seed?: number; color?: string }) {
+const SHRUB_GEO = new THREE.IcosahedronGeometry(1, 0)
+
+export function Shrub({ pos, scale = 1, color = '#557f36' }: { pos: V3; scale?: number; seed?: number; color?: string }) {
   const leaf = useTiled(TEX.grass, [1, 1])
-  const g = useMemo(() => jitter(new THREE.IcosahedronGeometry(1, 1), 0.3, seed), [seed])
   return (
-    <mesh position={[pos[0], pos[1] + 0.45 * scale, pos[2]]} scale={[scale * 1.2, scale * 0.8, scale * 1.1]} geometry={g} receiveShadow>
-      <meshStandardMaterial map={leaf} color={color} roughness={0.9} flatShading />
+    <mesh position={[pos[0], pos[1] + 0.45 * scale, pos[2]]} scale={[scale * 1.2, scale * 0.8, scale * 1.1]} geometry={SHRUB_GEO}>
+      <meshLambertMaterial map={leaf} color={color} flatShading />
     </mesh>
+  )
+}
+
+/** Shared shrub mesh for a planter, ivy patch, or garden ring. */
+export function ShrubField({ points }: { points: { pos: V3; scale?: number; color?: string }[] }) {
+  const leaf = useTiled(TEX.grass, [1, 1])
+  const ref = useRef<THREE.InstancedMesh>(null)
+  useLayoutEffect(() => {
+    const mesh = ref.current
+    if (!mesh) return
+    const m = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const c = new THREE.Color()
+    points.forEach((p, i) => {
+      const s = p.scale ?? 1
+      m.compose(new THREE.Vector3(p.pos[0], p.pos[1] + 0.45 * s, p.pos[2]), q, new THREE.Vector3(s * 1.2, s * 0.8, s * 1.1))
+      mesh.setMatrixAt(i, m)
+      mesh.setColorAt(i, c.set(p.color ?? '#557f36'))
+    })
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+  }, [points])
+  if (points.length === 0) return null
+  return (
+    <instancedMesh ref={ref} args={[SHRUB_GEO, undefined, points.length]} frustumCulled={false}>
+      <meshLambertMaterial map={leaf} flatShading />
+    </instancedMesh>
   )
 }
 

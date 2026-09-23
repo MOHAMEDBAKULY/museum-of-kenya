@@ -1,10 +1,12 @@
 import { Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { Suspense, useContext, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { ROOM_BY_ID } from '../../data/rooms'
-import { Bench, Blob, Cutout, FONT, Frame, Panel, Shrub, Sway, Tree, WallCase } from '../kit'
+import { useTour } from '../../store'
+import { Bench, Blob, Cutout, FONT, Frame, Panel, Shrub, ShrubField, Sway, Tree, WallCase } from '../kit'
 import { TEX, useTiled } from '../tex'
+import { RoomActiveContext } from '../roomActive'
 import { OutdoorShell } from './shell'
 
 function mosaicTexture(seed: number) {
@@ -230,9 +232,13 @@ function Facade() {
         <boxGeometry args={[12, 0.4, 7.8]} />
         <meshStandardMaterial color="#8a8680" roughness={0.7} />
       </mesh>
-      {Array.from({ length: 16 }).map((_, i) => (
-        <Shrub key={i} pos={[-15.2, 0.15 + (i % 5) * 1.35, z0 - 1.2 + Math.floor(i / 5) * 1.5]} scale={0.85} seed={140 + i} color={i % 3 ? '#5d8a3c' : '#6f9a48'} />
-      ))}
+      <ShrubField
+        points={Array.from({ length: 16 }, (_, i) => ({
+          pos: [-15.2, 0.15 + (i % 5) * 1.35, z0 - 1.2 + Math.floor(i / 5) * 1.5] as [number, number, number],
+          scale: 0.85,
+          color: i % 3 ? '#5d8a3c' : '#6f9a48',
+        }))}
+      />
       {/* the cream right wing with windows */}
       <mesh position={[21, 4.3, z0 - 0.5]} castShadow receiveShadow>
         <boxGeometry args={[12, 8.6, 8]} />
@@ -263,9 +269,13 @@ function RightPlanter() {
       <Tree pos={[-1.6, 1, 0.2]} kind="palm" scale={0.95} />
       <Tree pos={[1.4, 1, -0.6]} kind="palm" scale={0.75} />
       <Tree pos={[1.2, 0, -3.4]} kind="broad" scale={1.1} seed={77} />
-      {[-2.2, -0.6, 0.4, 1.9, 2.4, -1.2].map((x, i) => (
-        <Shrub key={i} pos={[x, 1, i % 2 ? 0.7 : -0.5]} scale={0.55 + (i % 3) * 0.15} seed={71 + i} color={i % 2 ? '#3f6f2c' : '#577f35'} />
-      ))}
+      <ShrubField
+        points={[-2.2, -0.6, 0.4, 1.9, 2.4, -1.2].map((x, i) => ({
+          pos: [x, 1, i % 2 ? 0.7 : -0.5] as [number, number, number],
+          scale: 0.55 + (i % 3) * 0.15,
+          color: i % 2 ? '#3f6f2c' : '#577f35',
+        }))}
+      />
     </group>
   )
 }
@@ -290,10 +300,12 @@ function Signboards() {
 
 export function Forecourt() {
   const room = ROOM_BY_ID.forecourt
+  const dressing = useTour((s) => s.dressing)
+  const active = useContext(RoomActiveContext)
   return (
     <OutdoorShell room={room} sun={[-16, 20, 30]} groundTile={1.3} groundColor="#d9bba6">
       <Facade />
-      <TreeSculpture />
+      <Suspense fallback={null}>{active && dressing && <TreeSculpture />}</Suspense>
       <Signboards />
       <RightPlanter />
       <group position={[-14, 0, -15]}>
@@ -522,11 +534,17 @@ export function Gardens() {
           <Tree pos={[x, 0, z]} kind={k} scale={s} seed={50 + i} />
         </Sway>
       ))}
-      {Array.from({ length: 16 }).map((_, i) => {
-        const a = (i / 16) * Math.PI * 2 + 0.2
-        const r = 7 + (i % 3) * 1.6
-        return <Shrub key={i} pos={[Math.cos(a) * r, 0, Math.sin(a) * r]} scale={0.6 + (i % 4) * 0.12} seed={80 + i} color={i % 2 ? '#4b7a2f' : '#6a8f3a'} />
-      })}
+      <ShrubField
+        points={Array.from({ length: 16 }, (_, i) => {
+          const a = (i / 16) * Math.PI * 2 + 0.2
+          const r = 7 + (i % 3) * 1.6
+          return {
+            pos: [Math.cos(a) * r, 0, Math.sin(a) * r] as [number, number, number],
+            scale: 0.6 + (i % 4) * 0.12,
+            color: i % 2 ? '#4b7a2f' : '#6a8f3a',
+          }
+        })}
+      />
       <group position={[-10, 0, -10]}>
         <mesh position={[0, 0.8, 0]} castShadow>
           <boxGeometry args={[0.12, 1.6, 0.12]} />
